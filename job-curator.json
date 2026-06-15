@@ -1,0 +1,880 @@
+{
+  "name": "Job Curator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -400,
+        0
+      ],
+      "id": "7ee3b944-5e6c-46bf-b607-190b2fef503f",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://weworkremotely.com/categories/remote-programming-jobs.rss",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -176,
+        64
+      ],
+      "id": "9a7d62e6-5c22-4cdb-83b4-1d7925d76a5f",
+      "name": "RSS: WWR Programming"
+    },
+    {
+      "parameters": {
+        "url": "https://weworkremotely.com/categories/remote-full-stack-programming-jobs.rss",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -192,
+        256
+      ],
+      "id": "60f9bf05-eb62-49f9-ad9a-e591bd03581e",
+      "name": "RSS: WWR Full-Stack"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "112dd9dc-5e83-42be-a28d-1f8010b0cc93",
+              "leftValue": "={{ $json.pubDate }}",
+              "rightValue": "={{ new Date(Date.now() - 24*60*60*1000) }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "after"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        16,
+        64
+      ],
+      "id": "26d4078e-bb70-46c1-85b4-9c776ff940c7",
+      "name": "Filter: Date WWR P"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "112dd9dc-5e83-42be-a28d-1f8010b0cc93",
+              "leftValue": "={{ $json.pubDate }}",
+              "rightValue": "={{ new Date(Date.now() - 24*60*60*1000) }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "after"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        16,
+        256
+      ],
+      "id": "4cb98cd6-cc8d-4966-84c3-0df386bed546",
+      "name": "Filter: Date WWR FS"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        256,
+        0
+      ],
+      "id": "af31dbe1-6466-4187-986c-2251766a8872",
+      "name": "Merge: Combine Sources"
+    },
+    {
+      "parameters": {
+        "jsCode": "// === USER CONFIG ===\n// Edit these patterns to match your job search profile.\n// Patterns are case-insensitive regex sources (without delimiters).\n\nconst config = {\n  // Titles containing these words are dropped immediately.\n  antiPatterns: [\n    'product manager', 'product marketing', 'content marketer',\n    'sales', 'account executive', 'customer success', 'recruiter',\n    'devops', 'sre', 'infrastructure', 'security engineer',\n    'designer', 'graphic', 'brand', 'ux researcher',\n    'mobile developer', 'ios', 'android', 'qa engineer',\n    'business analyst', 'data analyst', 'business development',\n    'partnerships', 'community manager'\n  ],\n  \n  // Strong signals — if found in title, pass immediately.\n  // If only in description, still pass (last resort).\n  strongPositive: [\n    'ai', 'ml', 'llm', 'machine learning', 'prompt',\n    'annotation', 'alignment', 'rlhf',\n    'trust.{0,5}safety', 'content policy', 'conversation design'\n  ],\n  \n  // Title patterns that pass independently of strongPositive\n  // (e.g. seniority + role combos).\n  titleAllowlist: [\n    '(senior|staff|lead).{0,30}(frontend|front.end|react|full.stack|software engineer)'\n  ]\n};\n\n// === LOGIC (do not edit unless you need to change pipeline behaviour) ===\n\nconst antiRegex = new RegExp(config.antiPatterns.join('|'), 'i');\nconst positiveRegex = new RegExp('\\\\b(' + config.strongPositive.join('|') + ')\\\\b', 'i');\nconst allowRegex = new RegExp(config.titleAllowlist.join('|'), 'i');\n\nconst items = $input.all();\n\nconst seen = new Set();\n\nconst filtered = items.filter(item => {\n  // Dedup by link\n  const link = item.json.link || item.json.url || '';\n  if (seen.has(link)) return false;\n  seen.add(link);\n\n  // Keyword filter\n  const title = (item.json.title || '').toLowerCase();\n  const description = (item.json.contentSnippet || item.json.description || '').toLowerCase();\n\n  if (antiRegex.test(title)) return false;\n  if (positiveRegex.test(title)) return true;\n  if (allowRegex.test(title)) return true;\n  return positiveRegex.test(description);\n});\n\nreturn filtered;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        0
+      ],
+      "id": "53376ba4-37b1-4ab4-b84d-cb827434d469",
+      "name": "Code: Dedup + Keywords"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "93f52a66-5e66-4bdc-850e-7998f37c1b6d",
+              "name": "prompt",
+              "value": "==You are evaluating job postings against a candidate's criteria. Return structured JSON.\n\nCANDIDATE CRITERIA:\n{{ $json.criteria }}\n\nJOB POSTING:\nJob ID: {{ $('Code: Dedup Seen in Sheet').item.json.link }}\nTitle: {{ $('Code: Dedup Seen in Sheet').item.json.title }}\n\nDescription: {{ ($('Code: Dedup Seen in Sheet').item.json.content || $('Code: Dedup Seen in Sheet').item.json.contentSnippet || '').replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').substring(0, 2000) }}\n\nReturn ONLY valid JSON, no markdown:\n{\n  \"relevant\": true | false,\n  \"fit_score\": 1-10,\n  \"category\": \"string matching one of the categories from criteria\",\n  \"reason\": \"one sentence explaining the score\",\n  \"red_flags\": [\"specific issues from the candidate's criteria\"],\n  \"job_id\": \"copy the Job ID from input exactly as provided\"\n}",
+              "type": "string"
+            },
+            {
+              "id": "7ab69197-4126-41d8-83e0-3dcd203389d3",
+              "name": "original_title",
+              "value": "={{ $('Code: Dedup Seen in Sheet').item.json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "126dc48c-a677-4715-b0e7-d744de5d28be",
+              "name": "original_link",
+              "value": "={{ $('Code: Dedup Seen in Sheet').item.json.link }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        0
+      ],
+      "id": "3721460d-7fad-4132-a379-d749a3e62f92",
+      "name": "Set: Build Prompt"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "claude-sonnet-4-5"
+            },
+            {
+              "name": "max_tokens",
+              "value": "={{ 500 }}"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{ role: \"user\", content: $json.prompt }] }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1408,
+        -160
+      ],
+      "id": "82efeedc-ddb2-4fd1-b8d5-1545ff82d4c8",
+      "name": "HTTP: Claude API",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RKTZkz8kbQi2hSzp",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const responseText = item.json.content[0].text;\n  \n  // На случай если Claude обернул в markdown-блок\n  const cleaned = responseText.replace(/```json|```/g, '').trim();\n  \n  let parsed;\n  try {\n    parsed = JSON.parse(cleaned);\n  } catch (e) {\n    parsed = {\n      relevant: false,\n      fit_score: 0,\n      category: \"other\",\n      reason: \"JSON parse failed\",\n      red_flags: [\"parse error\"],\n      raw_response: responseText\n    };\n  }\n  \n  results.push({ json: parsed });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        -160
+      ],
+      "id": "b3ef99fd-db35-4662-8c74-1931ec101805",
+      "name": "Code: Parse Response"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "job_id",
+              "field2": "original_link"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1728,
+        -16
+      ],
+      "id": "bb0566eb-9ad3-4cef-9f99-ef67ddacdabf",
+      "name": "Merge: Add Original Data"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "94f757c5-bf50-4da7-aeff-a4c65cdd92e9",
+              "name": "relevant",
+              "value": "={{ $json.relevant }}",
+              "type": "boolean"
+            },
+            {
+              "id": "d63a2649-71ad-4dd6-8b5b-c2655338fa93",
+              "name": "fit_score",
+              "value": "={{ $json.fit_score }}",
+              "type": "number"
+            },
+            {
+              "id": "e291e462-10ff-48ef-a86b-ec45ea331e90",
+              "name": "category",
+              "value": "={{ $json.category }}",
+              "type": "string"
+            },
+            {
+              "id": "efe66fea-f003-4d04-8d32-1014d9025858",
+              "name": "reason",
+              "value": "={{ $json.reason }}",
+              "type": "string"
+            },
+            {
+              "id": "0cd3b438-9277-4cd1-9395-de9f9bd02eed",
+              "name": "red_flags",
+              "value": "={{ $json.red_flags }}",
+              "type": "array"
+            },
+            {
+              "id": "aac04f13-f394-45fe-b707-5219ad306f9c",
+              "name": "original_title",
+              "value": "={{ $json.original_title }}",
+              "type": "string"
+            },
+            {
+              "id": "b7f73b12-5c19-4864-be7c-f40de0fd28ea",
+              "name": "original_link",
+              "value": "={{ $json.original_link }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        -16
+      ],
+      "id": "d95924d5-ad55-4cb9-a91d-b1137a576383",
+      "name": "Edit: Clean Output Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get existing links from sheet\nconst existingRows = $('Sheets: Read Existing').all();\nconst existingLinks = new Set(\n  existingRows.map(row => row.json.link).filter(Boolean)\n);\n\nconst seen = new Set();\nreturn $('Code: Dedup + Keywords').all().filter(item => {\n  const link = item.json.link || '';\n  if (existingLinks.has(link)) return false;\n  if (seen.has(link)) return false;\n  seen.add(link);\n  return true;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        784,
+        0
+      ],
+      "id": "a11487d9-9be8-4271-9b22-44f624a15a07",
+      "name": "Code: Dedup Seen in Sheet"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1-_28LJ23DhVvVSZFUVaN-bOGK-Xla5JeNsOS9DyVyrI",
+          "mode": "list",
+          "cachedResultName": "Job Curator",
+          "cachedResultUrl": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": ""
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "link": "={{ $json.original_link }}",
+            "category": "={{ $json.category }}",
+            "fit_score": "={{ $json.fit_score }}",
+            "reason": "={{ $json.reason }}",
+            "red_flags": "={{ ($json.red_flags || []).join('; ') }}",
+            "date": "={{ new Date().toISOString().split('T')[0] }}",
+            "title": "={{ $json.original_title }}",
+            "relevant": "={{ $json.relevant }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "link",
+              "displayName": "link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "relevant",
+              "displayName": "relevant",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fit_score",
+              "displayName": "fit_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "red_flags",
+              "displayName": "red_flags",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2112,
+        -16
+      ],
+      "id": "8f14e91b-5c8d-44af-a6bf-2f119c9d2261",
+      "name": "Sheets: Append Results",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "qiO3KcGZC7hZm5ZM",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1-_28LJ23DhVvVSZFUVaN-bOGK-Xla5JeNsOS9DyVyrI",
+          "mode": "list",
+          "cachedResultName": "Job Curator",
+          "cachedResultUrl": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": ""
+        },
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "specifyRangeA1",
+              "range": "C1:C50"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        608,
+        0
+      ],
+      "id": "51b6b3e8-875e-4d8c-b403-1b98ed17ac63",
+      "name": "Sheets: Read Existing",
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "qiO3KcGZC7hZm5ZM",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "228c5aab-ddf6-4d4c-acf6-530c4ee16be6",
+              "name": "criteria",
+              "value": "TARGET ROLES: - AI/ML engineering with focus on LLM evaluation, alignment, or prompt engineering - Trust & safety operations, content policy analyst, annotation operations - Senior frontend (React/TypeScript) at companies with explicit AI product  LOCATION: - UK-based or remote with UK-friendly hours - US-only remote does not work  WORK STYLE: - Individual contributor preferred - Async-friendly work culture - Not founding or early-stage chaos  EXPERIENCE LEVEL: - 2-5 years in AI/ML adjacent - Avoid roles requiring 7+ years specific stack  DISQUALIFIERS: - Sales, customer success, training/coaching as primary function - Heavy travel or relocation - Equity-only compensation",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        992,
+        0
+      ],
+      "id": "7dbba78c-f412-4ac8-8dbf-5104033faa69",
+      "name": "Set: Add Criteria",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "dc8383f8-d5ce-49ad-ab2b-d718adff1e10",
+              "leftValue": "={{ $json.relevant }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "d683b34f-009e-4811-87b7-9b5f76fd5d06",
+              "leftValue": "={{ $json.fit_score }}",
+              "rightValue": 5,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        1920,
+        -208
+      ],
+      "id": "1073b0b8-debe-4a1a-9993-18a5c575835d",
+      "name": "Filter: Relevant Only"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nif (items.length === 0) {\n  return [{ json: { skip: true, html: '' } }];\n}\n\nconst rows = items.map(item => {\n  const score = item.json.fit_score || '?';\n  const title = item.json.original_title || item.json.title || 'Unknown';\n  const link = item.json.original_link || item.json.link || '#';\n  const reason = item.json.reason || '';\n  const flags = (item.json.red_flags || []).join(', ');\n  \n  return `\n    <tr>\n      <td style=\"padding:8px;border-bottom:1px solid #eee;\">\n        <a href=\"${link}\" style=\"font-weight:bold;color:#1a73e8;\">${title}</a>\n      </td>\n      <td style=\"padding:8px;border-bottom:1px solid #eee;text-align:center;\">\n        <strong>${score}/10</strong>\n      </td>\n      <td style=\"padding:8px;border-bottom:1px solid #eee;\">${reason}</td>\n      <td style=\"padding:8px;border-bottom:1px solid #eee;color:#d93025;font-size:12px;\">${flags}</td>\n    </tr>\n  `;\n}).join('');\n\nconst html = `\n  <html><body style=\"font-family:Arial,sans-serif;max-width:900px;margin:0 auto;\">\n    <h2 style=\"color:#1a73e8;\">Job Curator — Daily Digest</h2>\n    <p style=\"color:#666;\">${new Date().toLocaleDateString('en-GB')} · ${items.length} relevant job${items.length > 1 ? 's' : ''} found</p>\n    <table style=\"width:100%;border-collapse:collapse;\">\n      <thead>\n        <tr style=\"background:#f8f9fa;\">\n          <th style=\"padding:8px;text-align:left;\">Role</th>\n          <th style=\"padding:8px;text-align:center;\">Score</th>\n          <th style=\"padding:8px;text-align:left;\">Why</th>\n          <th style=\"padding:8px;text-align:left;\">Red Flags</th>\n        </tr>\n      </thead>\n      <tbody>${rows}</tbody>\n    </table>\n    <p style=\"color:#999;font-size:12px;margin-top:20px;\">Powered by Job Curator · n8n + Claude API</p>\n  </body></html>\n`;\n\nreturn [{ json: { html, count: items.length, skip: false } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2128,
+        -208
+      ],
+      "id": "5a2285b8-3369-4b32-94f3-78d7ba3d30cb",
+      "name": "Code: Build Email"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7b7c33a5-56e7-45c9-933f-8d675f67b258",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        2336,
+        -208
+      ],
+      "id": "2af9d16f-c643-4f31-bc73-bcebcf95f640",
+      "name": "Filter: Skip if Empty"
+    },
+    {
+      "parameters": {
+        "sendTo": "",
+        "subject": "={{ 'Job Curator: ' + $json.count + ' new job' + ($json.count > 1 ? 's' : '') + ' · ' + new Date().toLocaleDateString('en-GB') }}",
+        "message": "={{ $json.html }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2544,
+        -208
+      ],
+      "id": "4439997e-1611-42ab-9e69-f8de0fe38017",
+      "name": "Send a message",
+      "webhookId": "e39c83dc-2f62-4ed1-9351-181fa300bbef",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "h01SYdiBAUsrpDWq",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "RSS: WWR Programming",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS: WWR Full-Stack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS: WWR Programming": {
+      "main": [
+        [
+          {
+            "node": "Filter: Date WWR P",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS: WWR Full-Stack": {
+      "main": [
+        [
+          {
+            "node": "Filter: Date WWR FS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Date WWR P": {
+      "main": [
+        [
+          {
+            "node": "Merge: Combine Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Date WWR FS": {
+      "main": [
+        [
+          {
+            "node": "Merge: Combine Sources",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge: Combine Sources": {
+      "main": [
+        [
+          {
+            "node": "Code: Dedup + Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Dedup + Keywords": {
+      "main": [
+        [
+          {
+            "node": "Sheets: Read Existing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set: Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Claude API",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge: Add Original Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "HTTP: Claude API": {
+      "main": [
+        [
+          {
+            "node": "Code: Parse Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Parse Response": {
+      "main": [
+        [
+          {
+            "node": "Merge: Add Original Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge: Add Original Data": {
+      "main": [
+        [
+          {
+            "node": "Edit: Clean Output Fields",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filter: Relevant Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit: Clean Output Fields": {
+      "main": [
+        [
+          {
+            "node": "Sheets: Append Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Dedup Seen in Sheet": {
+      "main": [
+        [
+          {
+            "node": "Set: Add Criteria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets: Read Existing": {
+      "main": [
+        [
+          {
+            "node": "Code: Dedup Seen in Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set: Add Criteria": {
+      "main": [
+        [
+          {
+            "node": "Set: Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Relevant Only": {
+      "main": [
+        [
+          {
+            "node": "Code: Build Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Build Email": {
+      "main": [
+        [
+          {
+            "node": "Filter: Skip if Empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Skip if Empty": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8eb9dc65-0c5f-485a-a769-86782c8c2afa",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "66360772ad9b38c5be87704ad5cd2936702584ca8b513e4acf71f4b712ee426e"
+  },
+  "nodeGroups": [],
+  "id": "po0dt39jKzbhe03X",
+  "tags": []
+}
